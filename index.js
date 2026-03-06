@@ -1,7 +1,8 @@
 import { chromium } from 'playwright';
 import axios from 'axios';
-import fs from 'fs';
 
+const EMAIL = process.env.FINVIA_EMAIL;
+const PASSWORD = process.env.FINVIA_PASSWORD;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const TOPIC_ID = 23338;
@@ -57,17 +58,20 @@ function getStats() {
     return `📊 <b>Статистика</b>\n\nЗа сегодня: ${todayCount} заявок / ${todaySum.toLocaleString('ru-RU')} ARS\nЗа час: ${hourCount} заявок / ${hourSum.toLocaleString('ru-RU')} ARS\nВсего: ${totalCount} заявок / ${totalSum.toLocaleString('ru-RU')} ARS`;
 }
 
-async function loadCookiesAndStart() {
+async function login() {
     browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext();
+    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     page = await context.newPage();
 
-    // Загружаем cookies (ты создашь этот файл один раз)
-    const cookies = JSON.parse(fs.readFileSync('cookies.json', 'utf8'));
-    await context.addCookies(cookies);
+    await page.goto('https://lk.finvia.trade/payouts/available', { waitUntil: 'networkidle' });
 
-    await page.goto('https://lk.finvia.trade/payouts/available');
-    console.log('✅ Бот запущен с твоими cookies');
+    await page.fill('input[placeholder="testclient4"], input[type="text"]', EMAIL);
+    await page.fill('input[type="password"]', PASSWORD);
+    await page.click('button:has-text("Войти")');
+
+    await page.waitForURL('**/payouts/available*', { timeout: 30000 });
+
+    console.log('✅ Успешный вход');
     sendTelegram('🚀 Бот 24/7 запущен!\nНапиши /menu');
     setInterval(checkAndTake, RELOAD_INTERVAL);
 }
@@ -76,8 +80,9 @@ async function checkAndTake() {
     if (!isRunning || !page) return;
     await page.reload();
 
-    // Сортируем строки по сумме (от большей к меньшей)
     const rows = await page.locator('tbody tr').all();
+
+    // Сортировка по сумме (от большей к меньшей)
     const sortedRows = [...rows].sort(async (a, b) => {
         const aText = await a.locator('td').nth(3).textContent();
         const bText = await b.locator('td').nth(3).textContent();
@@ -113,7 +118,7 @@ async function checkAndTake() {
     }
 }
 
-// Обработка Telegram команд
+// Обработка команд и кнопок
 setInterval(async () => {
     try {
         const res = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=8`);
@@ -146,4 +151,4 @@ setInterval(async () => {
 }, 8000);
 
 // Запуск
-loadCookiesAndStart();
+login();
