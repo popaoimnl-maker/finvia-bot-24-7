@@ -1,0 +1,12 @@
+{
+  "name": "finvia-bot-24-7",
+  "version": "1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "playwright": "^1.51.0",
+    "axios": "^1.7.2"
+  }
+}
